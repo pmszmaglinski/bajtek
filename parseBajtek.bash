@@ -5,10 +5,10 @@ source .credentials
 
 # Urls
 baseUrl='http://stare.e-gry.net'
+prefixUrl="${baseUrl}/czasopisma"
 
-linksUrl="${baseUrl}/czasopisma/bajtek"
-linksUrl2="${baseUrl}/czasopisma/top-secret"
-linksUrl3="${baseUrl}/czasopisma/commodore-amiga"
+papers=('bajtek' 'top-secret' 'commodore-amiga')
+
 
 # Authentication
 loginUrl="${baseUrl}/login"
@@ -25,25 +25,33 @@ touch $logFile
 # Get authorization cookie
 curl -c $cookieName -d "login=${urlLogin}&pass=${urlPassword}" $loginUrl
 
+for j in "${papers[@]}"; do
 
-for i in $(curl -s $linksUrl | grep czasopisma/download | grep -Po 'href="/\K[^"]*')
- do 
- downloadUrl="${baseUrl}/${i}"
- echo "Parsing link: ${downloadUrl}"
+  # Create dir for paper if doesn't exists yet
+  downloadDir="files/${j}"
+  [[ -d ${downloadDir} ]] || mkdir -p ${downloadDir}
 
- # Get download cookie
- curl -s -b $cookieName -c $cookieName $downloadUrl > /dev/null
+  # Set url to grab the download links
+  linksUrl="${prefixUrl}/${j}"
 
- # Get file name to save
- fileName=$(curl -s -b $cookieName $downloadUrl -I |  grep 'Location' | sed 's/^.*\///' | tr -d '\r')
- baseFileName=${fileName%.djvu}
+  for i in $(curl -s $linksUrl | grep czasopisma/download | grep -Po 'href="/\K[^"]*')
+    do 
+        downloadUrl="${baseUrl}/${i}"
+        echo "Parsing link: ${downloadUrl}"
 
- # Download file
- echo "Pobieram plik ${fileName} z linku ${downloadUrl}"
- curl -s -L -b $cookieName $downloadUrl --output "files/${fileName}" >> $logFile 2>&1
+        # Get download cookie
+        curl -s -b $cookieName -c $cookieName $downloadUrl > /dev/null
 
- exit 0
+        # Get file name to save
+        fileName=$(curl -s -b $cookieName $downloadUrl -I |  grep 'Location' | sed 's/^.*\///' | tr -d '\r')
+        baseFileName=${fileName%.djvu}
 
+        # Download file
+        echo "Pobieram plik ${fileName} z linku ${downloadUrl} do katalogu ${downloadDir}"
+        curl -s -L -b $cookieName $downloadUrl --output ${downloadDir}/${fileName} >> $logFile 2>&1
+
+        break
+  done
 done
 
 convertToPdf() {
